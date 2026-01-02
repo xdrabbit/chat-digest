@@ -1,10 +1,20 @@
 # chat-digest
 
-CLI tool to ingest markdown chat transcripts, emit structured JSON, and generate a concise handoff brief. Supports offline rule-based mode or optional local LLM via Ollama (e.g., `smollm2:latest`).
+CLI tool to ingest markdown chat transcripts and generate structured digests with advanced context preservation. Supports offline rule-based mode or optional local LLM via Ollama.
+
+## Features ✨
+
+- **📝 Resumption Prompts**: Ready-to-paste context for continuing conversations
+- **💻 Code Extraction**: Track code blocks with language, context, and file associations
+- **⭐ Importance Scoring**: Filter noise, prioritize valuable content
+- **📊 Multi-Format Output**: Context cards, detailed briefs, Slack summaries, markdown reports
+- **⏱️ Temporal Analysis**: Timeline tracking with supersession detection
+- **🔍 Entity Extraction**: Track dependencies, APIs, configs, people, topics
+- **🔄 Incremental Updates**: Append new messages to existing digests
 
 ## Quickstart
 
-1) Install dependencies (editable dev):
+1) Install dependencies:
 
 ```bash
 python -m venv .venv
@@ -12,47 +22,79 @@ source .venv/bin/activate
 pip install -e '.[dev]'
 ```
 
-2) Run on a markdown transcript:
+2) Basic usage:
 
 ```bash
-chat-digest mic_audio_settings.md --json out.json --brief brief.md --resume resume.md
+chat-digest transcript.md --json out.json --brief brief.md
 ```
 
-Generate a resumption prompt for continuing work in a new chat session.
+3) Generate resumption prompt:
 
-3) Use Ollama for the brief (requires local Ollama and the model pulled):
+```bash
+chat-digest transcript.md --resume resume.md
+```
+
+4) Multi-format output:
+
+```bash
+chat-digest transcript.md --all-formats ./outputs/
+```
+
+5) With LLM refinement:
 
 ```bash
 ollama pull smollm2:latest
-chat-digest mic_audio_settings.md --json out.json --brief brief.md --llm smollm2:latest
+chat-digest transcript.md --llm smollm2:latest --brief brief.md
 ```
 
-## CLI options
+## CLI Options
 
 ```bash
-chat-digest PATH [--json OUT] [--brief OUT] [--resume OUT] [--llm MODEL] [--max-brief-words N] [--schema-version 1]
+chat-digest PATH [OPTIONS]
 ```
 
-- `--json OUT`: write structured JSON to file (otherwise prints to stdout).
-- `--brief OUT`: write brief to file (otherwise prints to stdout).
-- `--resume OUT`: write resumption prompt for continuing in a new chat session.
-- `--llm MODEL`: use a local Ollama model for summary refinement (default: disabled).
-- `--max-brief-words N`: length cap for the brief (default 180).
+**Output Options:**
+- `--json OUT`: Structured JSON digest
+- `--brief OUT`: Concise summary
+- `--resume OUT`: Resumption prompt for new chat sessions
+- `--format OUT`: Custom format output (use with `--format-type`)
+- `--format-type TYPE`: Format type: `context_card`, `detailed`, `slack`, `markdown`
+- `--all-formats DIR`: Generate all formats in directory
 
-## What you get
+**Processing Options:**
+- `--llm MODEL`: Ollama model for summary refinement (e.g., `smollm2:latest`)
+- `--max-brief-words N`: Word limit for brief (default: 180)
 
-- Parsed turns with roles (`user`, `assistant`, `system`, `unknown`).
-- Tags for decisions, actions, questions, and code blocks.
-- Rule-based extractive brief; optional LLM-refined brief.
-- **Resumption prompts**: Ready-to-paste context for continuing work in a new chat session, including:
-  - Summary of previous discussion
-  - Key decisions and pending actions
-  - Files mentioned and code snippets
-  - Open questions blocking progress
-  - Intelligent next-step suggestions
+## What You Get
+
+### Core Features
+- Parsed messages with roles (`user`, `assistant`, `system`)
+- Tags for decisions, actions, questions, code blocks
+- Rule-based extractive summaries
+- Optional LLM-refined summaries
+
+### Advanced Features
+- **Code Tracking**: Language detection, file associations, latest versions
+- **Importance Scoring**: 0-10 scoring, noise filtering, smart prioritization
+- **Timeline Analysis**: Event tracking, supersession detection, conversation phases
+- **Entity Extraction**: Dependencies, APIs, configurations, people, topics
+- **Incremental Updates**: Append to existing digests without reprocessing
+
+### Output Formats
+- **Context Cards**: Ultra-compressed (<100 words) for quick handoffs
+- **Detailed Briefs**: Comprehensive with all signals and code summary
+- **Slack Summaries**: Emoji-rich, platform-optimized
+- **Markdown Reports**: Full documentation with table of contents
+- **Resumption Prompts**: Ready-to-paste context for continuing work
 
 ## Tests
 
 ```bash
-pytest
+pytest  # 104 tests, all passing
 ```
+
+## Development
+
+**Python Version**: 3.11+  
+**Test Coverage**: 104 tests across 7 feature modules  
+**Repository**: [github.com/xdrabbit/chat-digest](https://github.com/xdrabbit/chat-digest)
