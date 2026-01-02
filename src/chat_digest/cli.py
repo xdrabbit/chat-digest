@@ -8,6 +8,7 @@ from uuid import uuid4
 import typer
 
 from .parser import infer_title, parse_transcript
+from .resumption import generate_resumption_prompt
 from .schemas import ThreadDigest, ThreadMetadata
 from .summarize import extract_signals, generate_summary
 
@@ -19,6 +20,7 @@ def main(
     path: Path = typer.Argument(..., exists=True, readable=True, help="Path to markdown transcript"),
     json_out: Optional[Path] = typer.Option(None, "--json", help="Path to write JSON output"),
     brief_out: Optional[Path] = typer.Option(None, "--brief", help="Path to write brief output"),
+    resume_out: Optional[Path] = typer.Option(None, "--resume", help="Path to write resumption prompt"),
     llm: Optional[str] = typer.Option(None, "--llm", help="Ollama model name (e.g., smollm2:latest)"),
     max_brief_words: int = typer.Option(180, help="Word limit for brief"),
     schema_version: int = typer.Option(1, help="Schema version to embed in metadata"),
@@ -56,6 +58,11 @@ def main(
         brief_out.write_text(summary.brief, encoding="utf-8")
     else:
         typer.echo("\nBrief:\n" + summary.brief)
+
+    if resume_out:
+        resumption_prompt = generate_resumption_prompt(digest)
+        resume_out.write_text(resumption_prompt, encoding="utf-8")
+        typer.secho(f"\n✓ Resumption prompt written to {resume_out}", fg=typer.colors.GREEN)
 
 
 if __name__ == "__main__":
