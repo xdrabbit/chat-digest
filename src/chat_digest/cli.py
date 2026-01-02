@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import typer
 
+from .formats import generate_all_formats, generate_context_card
 from .parser import infer_title, parse_transcript
 from .resumption import generate_resumption_prompt
 from .schemas import ThreadDigest, ThreadMetadata
@@ -21,6 +22,9 @@ def main(
     json_out: Optional[Path] = typer.Option(None, "--json", help="Path to write JSON output"),
     brief_out: Optional[Path] = typer.Option(None, "--brief", help="Path to write brief output"),
     resume_out: Optional[Path] = typer.Option(None, "--resume", help="Path to write resumption prompt"),
+    format_out: Optional[Path] = typer.Option(None, "--format", help="Path to write formatted output (specify type with --format-type)"),
+    format_type: str = typer.Option("detailed", "--format-type", help="Format type: context_card, detailed, slack, markdown"),
+    all_formats_dir: Optional[Path] = typer.Option(None, "--all-formats", help="Directory to write all format types"),
     llm: Optional[str] = typer.Option(None, "--llm", help="Ollama model name (e.g., smollm2:latest)"),
     max_brief_words: int = typer.Option(180, help="Word limit for brief"),
     schema_version: int = typer.Option(1, help="Schema version to embed in metadata"),
@@ -63,6 +67,34 @@ def main(
         resumption_prompt = generate_resumption_prompt(digest)
         resume_out.write_text(resumption_prompt, encoding="utf-8")
         typer.secho(f"\n✓ Resumption prompt written to {resume_out}", fg=typer.colors.GREEN)
+
+    if format_out:
+        from .formats import generate_context_card, generate_detailed_brief, generate_slack_summary, generate_markdown_report
+        
+        format_map = {
+            "context_card": generate_context_card,
+            "detailed": generate_detailed_brief,
+            "slack": generate_slack_summary,
+            "markdown": generate_markdown_report,
+        }
+        
+        if format_type not in format_map:
+            typer.secho(f"Unknown format type: {format_type}", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+        
+        formatted = format_map[format_type](digest)
+        format_out.write_text(formatted, encoding="utf-8")
+        typer.secho(f"\n✓ {format_type} format written to {format_out}", fg=typer.colors.GREEN)
+
+    if all_formats_dir:
+        all_formats_dir.mkdir(parents=True, exist_ok=True)
+        all_formats = generate_all_formats(digest)
+        
+        for fmt_name, content in all_formats.items():
+            out_path = all_formats_dir / f"{fmt_name}.md"
+            out_path.write_text(content, encoding="utf-8")
+        
+        typer.secho(f"\n✓ All formats written to {all_formats_dir}/", fg=typer.colors.GREEN)
 
 
 if __name__ == "__main__":
