@@ -85,6 +85,7 @@ def test_resumption_prompt_with_code():
         actions=[],
         open_questions=[],
         constraints=[],
+        code_summary={"total_blocks": 1, "languages": {"python": 1}, "unique_files": 0, "files": {}, "all_blocks": []},
     )
     
     digest = ThreadDigest(
@@ -95,7 +96,7 @@ def test_resumption_prompt_with_code():
     
     prompt = generate_resumption_prompt(digest)
     
-    assert "Code blocks present" in prompt or "snippet" in prompt.lower()
+    assert "Code blocks" in prompt or "snippet" in prompt.lower()
 
 
 def test_resumption_prompt_with_questions():

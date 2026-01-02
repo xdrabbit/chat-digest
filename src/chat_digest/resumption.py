@@ -43,9 +43,8 @@ def generate_resumption_prompt(digest: ThreadDigest) -> str:
     
     # Current state - extract file mentions and code
     files_mentioned = _extract_file_mentions(messages)
-    code_snippets = _extract_code_snippets(messages)
     
-    if files_mentioned or code_snippets:
+    if files_mentioned or (summary.code_summary and summary.code_summary.get("total_blocks", 0) > 0):
         sections.append("## Current State")
         
         if files_mentioned:
@@ -54,9 +53,21 @@ def generate_resumption_prompt(digest: ThreadDigest) -> str:
                 sections.append(f"- `{file}`")
             sections.append("")
         
-        if code_snippets:
-            sections.append(f"**Code blocks present:** {len(code_snippets)} snippet(s) in conversation")
-            sections.append("")
+        # Enhanced code block display
+        if summary.code_summary:
+            code_sum = summary.code_summary
+            total = code_sum.get("total_blocks", 0)
+            unique_files = code_sum.get("unique_files", 0)
+            languages = code_sum.get("languages", {})
+            
+            if total > 0:
+                lang_str = ", ".join(f"{lang} ({count})" for lang, count in languages.items())
+                sections.append(f"**Code blocks:** {total} snippet(s) in conversation")
+                if lang_str:
+                    sections.append(f"  - Languages: {lang_str}")
+                if unique_files > 0:
+                    sections.append(f"  - Associated with {unique_files} file(s)")
+                sections.append("")
     
     # Pending actions
     if summary.actions:

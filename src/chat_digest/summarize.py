@@ -7,6 +7,7 @@ from typing import Dict, List, Optional
 
 import requests
 
+from .code_extraction import get_code_summary
 from .llm import OllamaClient, OllamaConfig
 from .schemas import Message, Summary
 
@@ -53,12 +54,16 @@ def generate_summary(
         if maybe_brief:
             brief = maybe_brief
 
+    # Extract code summary
+    code_summary = get_code_summary(messages)
+
     return Summary(
         brief=brief,
         decisions=signals.get("decisions", []),
         actions=signals.get("actions", []),
         open_questions=signals.get("open_questions", []),
         constraints=signals.get("constraints", []),
+        code_summary=code_summary if code_summary["total_blocks"] > 0 else None,
     )
 
 

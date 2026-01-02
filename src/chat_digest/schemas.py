@@ -27,6 +27,7 @@ class Summary(BaseModel):
     actions: List[str] = Field(default_factory=list)
     open_questions: List[str] = Field(default_factory=list)
     constraints: List[str] = Field(default_factory=list)
+    code_summary: Optional[dict] = None  # Summary of code blocks
 
 
 class ThreadDigest(BaseModel):
