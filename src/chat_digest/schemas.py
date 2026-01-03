@@ -11,6 +11,7 @@ class Message(BaseModel):
     content: str
     tags: List[str] = Field(default_factory=list)
     timestamp: Optional[str] = None
+    importance_score: float = 5.0  # 0-10 scale, default neutral
 
 
 class ThreadMetadata(BaseModel):

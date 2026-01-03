@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import typer
 
+from .chronicle import export_to_chronicle
 from .formats import generate_all_formats, generate_context_card
 from .parser import infer_title, parse_transcript
 from .resumption import generate_resumption_prompt
@@ -25,6 +26,9 @@ def main(
     format_out: Optional[Path] = typer.Option(None, "--format", help="Path to write formatted output (specify type with --format-type)"),
     format_type: str = typer.Option("detailed", "--format-type", help="Format type: context_card, detailed, slack, markdown"),
     all_formats_dir: Optional[Path] = typer.Option(None, "--all-formats", help="Directory to write all format types"),
+    chronicle_out: Optional[Path] = typer.Option(None, "--chronicle-export", help="Path to write Chronicle CSV export"),
+    chronicle_timeline: str = typer.Option("Legal", "--chronicle-timeline", help="Chronicle timeline name"),
+    chronicle_min_importance: float = typer.Option(5.0, "--chronicle-min-importance", help="Minimum importance score for Chronicle export"),
     llm: Optional[str] = typer.Option(None, "--llm", help="Ollama model name (e.g., smollm2:latest)"),
     max_brief_words: int = typer.Option(180, help="Word limit for brief"),
     schema_version: int = typer.Option(1, help="Schema version to embed in metadata"),
@@ -36,6 +40,11 @@ def main(
     if not messages:
         typer.secho("No messages parsed from transcript", fg=typer.colors.RED)
         raise typer.Exit(code=1)
+    
+    # Score message importance for Chronicle export and filtering
+    from .importance import score_message_importance
+    for msg in messages:
+        msg.importance_score = score_message_importance(msg)
 
     signals = extract_signals(messages)
     summary = generate_summary(messages, signals=signals, llm_model=llm, max_brief_words=max_brief_words)
@@ -95,6 +104,18 @@ def main(
             out_path.write_text(content, encoding="utf-8")
         
         typer.secho(f"\n✓ All formats written to {all_formats_dir}/", fg=typer.colors.GREEN)
+    
+    if chronicle_out:
+        event_count = export_to_chronicle(
+            digest,
+            chronicle_out,
+            timeline_name=chronicle_timeline,
+            min_importance=chronicle_min_importance,
+        )
+        typer.secho(
+            f"\n✓ Chronicle export written to {chronicle_out} ({event_count} events)",
+            fg=typer.colors.GREEN
+        )
 
 
 if __name__ == "__main__":

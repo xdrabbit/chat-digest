@@ -1,0 +1,45 @@
+title,description,date,timeline,actor,emotion,tags,evidence_links
+good morning Nyra,"good morning Nyra. I have to get to the bottom of this audio Mike issue on Oasis which is as you know Windows machine RTX 3060 i5 13400 32g ram so I’m using a Zoom audio interface the Zoom L2 and a sure MX 7V I think it’s called microphone. It’s all a great set up except for sometimes this setting the last image there I want where it says test microphone audio processing, choose different modes. If I do communications it’s much better, but for some reason that slides back to default a lot, wh...",2026-01-03 02:28:40,Legal,User,important,decision,
+"Good morning, Tom","Good morning, Tom. You're dealing with a frustrating but solvable issue: Windows keeps resetting your **input device’s processing mode**—from ""Communications"" back to ""Default""—which breaks your voice pickup for **Voice In**, especially given your setup:
+
+- **Zoom L-12** interface
+- **Shure MV7** mic (not MX7V—it’s MV7)
+- **Windows 11** on your **Oasis RTX 3060 i5-13400 rig**
+
+Let’s solve this permanently by locking down optimal mic settings and minimizing Windows interference.
+
+------
+
+### ✅...",2026-01-03 02:28:40,Legal,Assistant,critical,"question,decision,constraint",
+Yes please generate that script,Yes please generate that script. Also this tab in control panel can you help me select the correct playback setting it has been set to default playback device not the zoom,2026-01-03 02:28:40,Legal,User,urgent,decision,
+Excellent,"Excellent. Let’s get you **two things**:
+
+------
+
+## ✅ 1. Correct Setting on the “Listen” Tab
+
+In the Control Panel’s **Line Properties → Listen tab**, you want:
+
+- **[✓] Listen to this device**: ❌ **LEAVE UNCHECKED** (unless you're trying to monitor input in real time through your system speakers, which you are not).
+- **Playback through this device**:
+  If you *do* ever check that box, choose **Line (ZOOM L-12 Audio)** to avoid feedback loops or unexpected rerouting—but in your case:
+  ✅ **...",2026-01-03 02:28:40,Legal,Assistant,critical,"code,question,decision",
+Okay I feel really good about this working,Okay I feel really good about this working. Thank you so much will stand by and kind of monitor it,2026-01-03 02:28:40,Legal,User,important,decision,
+"You're so welcome, Tom — that sounds like a solid plan","You're so welcome, Tom — that sounds like a solid plan. 🛠️🎙️
+
+Here’s your quick **recap**:
+
+### ✅ Locked Down:
+
+- Input device set to **Zoom L-12**, with **Communications mode**
+- Windows exclusive control disabled
+- Enhancements off
+- “Listen to this device” correctly **left unchecked**
+- PowerShell script ready to persist settings after reboot
+
+------
+
+### 🧭 Next Steps:
+
+- Monitor behavior over the next few reboots and work sessions
+- If anything slides back (like the mode or gain), ping me...",2026-01-03 02:28:40,Legal,Assistant,important,decision,
