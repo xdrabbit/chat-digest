@@ -11,6 +11,7 @@ CLI tool to ingest markdown chat transcripts and generate structured digests wit
 - **⏱️ Temporal Analysis**: Timeline tracking with supersession detection
 - **🔍 Entity Extraction**: Track dependencies, APIs, configs, people, topics
 - **🔄 Incremental Updates**: Append new messages to existing digests
+- **📅 Chronicle Integration**: Export to Chronicle timeline CSV format
 
 ## Quickstart
 
@@ -32,6 +33,12 @@ chat-digest transcript.md --json out.json --brief brief.md
 
 ```bash
 chat-digest transcript.md --resume resume.md
+```
+
+4) Export to Chronicle timeline:
+
+```bash
+chat-digest daily-diary.md --chronicle-export events.csv
 ```
 
 4) Multi-format output:
@@ -86,15 +93,46 @@ chat-digest PATH [OPTIONS]
 - **Slack Summaries**: Emoji-rich, platform-optimized
 - **Markdown Reports**: Full documentation with table of contents
 - **Resumption Prompts**: Ready-to-paste context for continuing work
+- **Chronicle CSV**: Timeline events for Chronicle import
+
+## Chronicle Integration
+
+Export your daily chat diary directly to Chronicle timeline:
+
+```bash
+# Basic export (filters by importance >= 5.0)
+chat-digest daily-diary.md --chronicle-export events.csv
+
+# Custom timeline name
+chat-digest case-notes.md --chronicle-export events.csv --chronicle-timeline "Legal Case"
+
+# Adjust importance threshold
+chat-digest transcript.md --chronicle-export events.csv --chronicle-min-importance 7.0
+```
+
+**What gets exported:**
+- Important messages (score >= 5.0 by default)
+- Messages with relevant tags (decision, action, question, constraint, code)
+- Smart actor extraction (legal terms, @mentions, roles)
+- Emotion mapping from importance scores
+- Chronicle-compatible CSV format
+
+**Import to Chronicle:**
+1. Run chat-digest with `--chronicle-export`
+2. Open Chronicle web interface
+3. Import the generated CSV file
+4. Your timeline auto-populates! ✨
+
+See [CHRONICAL-INTEGRATION.md](CHRONICAL-INTEGRATION.md) for full integration details.
 
 ## Tests
 
 ```bash
-pytest  # 104 tests, all passing
+pytest  # 123 tests, all passing
 ```
 
 ## Development
 
 **Python Version**: 3.11+  
-**Test Coverage**: 104 tests across 7 feature modules  
+**Test Coverage**: 123 tests across 8 feature modules  
 **Repository**: [github.com/xdrabbit/chat-digest](https://github.com/xdrabbit/chat-digest)
