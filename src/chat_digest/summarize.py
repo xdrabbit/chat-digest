@@ -114,7 +114,10 @@ def _try_llm_brief(
 
     try:
         return client.generate(prompt)
-    except requests.RequestException:
+    except requests.RequestException as e:
+        import sys
+        print(f"⚠️  LLM call failed: {e}", file=sys.stderr)
+        print(f"   Falling back to rule-based brief", file=sys.stderr)
         return None
 
 
