@@ -16,6 +16,7 @@ def export_to_chronicle(
     output_path: Path,
     timeline_name: str = "Legal",
     min_importance: float = 5.0,
+    include_patterns: bool = False,
 ) -> int:
     """
     Export digest to Chronicle-compatible CSV format.
@@ -25,6 +26,7 @@ def export_to_chronicle(
         output_path: Path to write CSV file
         timeline_name: Chronicle timeline category (default: "Legal")
         min_importance: Minimum importance score to include (default: 5.0)
+        include_patterns: Whether to include detected patterns as events (default: False)
     
     Returns:
         Number of events exported
@@ -34,6 +36,14 @@ def export_to_chronicle(
         timeline_name=timeline_name,
         min_importance=min_importance,
     )
+    
+    # Add pattern events if requested
+    if include_patterns:
+        from .patterns import detect_all_patterns
+        
+        patterns = detect_all_patterns(digest.messages)
+        pattern_events = _patterns_to_chronicle_events(patterns, timeline_name)
+        events.extend(pattern_events)
     
     _write_chronicle_csv(events, output_path)
     
@@ -211,3 +221,46 @@ def _write_chronicle_csv(events: List[dict], output_path: Path) -> None:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(events)
+
+
+def _patterns_to_chronicle_events(patterns: List, timeline_name: str) -> List[dict]:
+    """Convert detected patterns to Chronicle events."""
+    from .patterns import Pattern
+    
+    events = []
+    
+    for pattern in patterns:
+        # Use last occurrence if available, otherwise current time
+        if pattern.last_occurrence:
+            date = pattern.last_occurrence.strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Map pattern type to title
+        title_map = {
+            'promise_break_cycle': 'Pattern: Promise-Break Cycle',
+            'escalation': 'Pattern: Escalation Detected',
+            'recurring_topic': f'Pattern: Recurring Topic',
+            'timing_pattern': 'Pattern: Timing Anomaly',
+        }
+        
+        title = title_map.get(pattern.pattern_type, f'Pattern: {pattern.pattern_type}')
+        
+        # Add frequency to title for recurring topics
+        if pattern.pattern_type == 'recurring_topic' and pattern.evidence:
+            title = f"Pattern: Recurring Topic '{pattern.evidence[0]}'"
+        
+        event = {
+            'title': title,
+            'description': pattern.description,
+            'date': date,
+            'timeline': timeline_name,
+            'actor': 'System',
+            'emotion': 'analytical',
+            'tags': f'pattern,{pattern.pattern_type},automated',
+            'evidence_links': '',  # Could link to evidence file
+        }
+        
+        events.append(event)
+    
+    return events

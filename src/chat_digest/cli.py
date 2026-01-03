@@ -29,6 +29,7 @@ def main(
     chronicle_out: Optional[Path] = typer.Option(None, "--chronicle-export", help="Path to write Chronicle CSV export"),
     chronicle_timeline: str = typer.Option("Legal", "--chronicle-timeline", help="Chronicle timeline name"),
     chronicle_min_importance: float = typer.Option(5.0, "--chronicle-min-importance", help="Minimum importance score for Chronicle export"),
+    chronicle_patterns: bool = typer.Option(False, "--chronicle-patterns", help="Include detected patterns as Chronicle events"),
     llm: Optional[str] = typer.Option(None, "--llm", help="Ollama model name (e.g., smollm2:latest)"),
     max_brief_words: int = typer.Option(180, help="Word limit for brief"),
     schema_version: int = typer.Option(1, help="Schema version to embed in metadata"),
@@ -111,6 +112,7 @@ def main(
             chronicle_out,
             timeline_name=chronicle_timeline,
             min_importance=chronicle_min_importance,
+            include_patterns=chronicle_patterns,
         )
         typer.secho(
             f"\n✓ Chronicle export written to {chronicle_out} ({event_count} events)",
