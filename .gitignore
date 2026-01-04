@@ -56,3 +56,7 @@ brief.md
 *.wav
 *.mp3
 *.m4a
+
+# Generated Chronicle CSV exports
+*_chronicle.csv
+test*.csv
