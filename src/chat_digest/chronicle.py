@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from .schemas import Message, ThreadDigest
+from .llm import OllamaClient, OllamaConfig
 
 
 def export_to_chronicle(
@@ -17,24 +18,20 @@ def export_to_chronicle(
     timeline_name: str = "Legal",
     min_importance: float = 5.0,
     include_patterns: bool = False,
+    llm_model: Optional[str] = None,
 ) -> int:
     """
     Export digest to Chronicle-compatible CSV format.
-    
-    Args:
-        digest: The thread digest to export
-        output_path: Path to write CSV file
-        timeline_name: Chronicle timeline category (default: "Legal")
-        min_importance: Minimum importance score to include (default: 5.0)
-        include_patterns: Whether to include detected patterns as events (default: False)
-    
-    Returns:
-        Number of events exported
     """
+    client = None
+    if llm_model:
+        client = OllamaClient(OllamaConfig(model=llm_model))
+
     events = _extract_chronicle_events(
         digest.messages,
         timeline_name=timeline_name,
         min_importance=min_importance,
+        llm_client=client,
     )
     
     # Add pattern events if requested
@@ -54,24 +51,40 @@ def _extract_chronicle_events(
     messages: List[Message],
     timeline_name: str,
     min_importance: float,
+    llm_client: Optional[OllamaClient] = None,
 ) -> List[dict]:
     """Extract Chronicle events from messages."""
     events = []
     
     for msg in messages:
-        # Only export important messages with specific tags
         if not _should_export_message(msg, min_importance):
             continue
         
+        # Distill title
+        title = _extract_title(msg)
+        if llm_client and len(msg.content) > 100:
+            try:
+                # Ask LLM for a concise 3-5 word title
+                prompt = (
+                    f"Create a 3-5 word concise legal title for the following message. "
+                    f"Return ONLY the title, no quotes or punctuation.\n\n"
+                    f"Message: {msg.content[:500]}"
+                )
+                suggested_title = llm_client.generate(prompt).strip().strip('"').strip('**')
+                if suggested_title and len(suggested_title) < 60:
+                    title = suggested_title
+            except Exception:
+                pass
+
         event = {
-            'title': _extract_title(msg),
-            'description': _truncate_description(msg.content),
+            'title': title,
+            'description': _clean_content(msg.content),
             'date': _format_date(msg.timestamp),
             'timeline': timeline_name,
             'actor': _extract_actor(msg),
             'emotion': _map_importance_to_emotion(msg),
             'tags': ','.join(msg.tags) if msg.tags else '',
-            'evidence_links': '',  # Future: extract from content
+            'evidence_links': '',
         }
         
         events.append(event)
@@ -81,54 +94,61 @@ def _extract_chronicle_events(
 
 def _should_export_message(msg: Message, min_importance: float) -> bool:
     """Determine if message should be exported to Chronicle."""
-    # Must have importance score
     if not hasattr(msg, 'importance_score'):
         return False
     
-    # Must meet minimum importance threshold
     if msg.importance_score < min_importance:
         return False
     
-    # Must have relevant tags
-    relevant_tags = {'decision', 'action', 'question', 'constraint', 'code'}
+    relevant_tags = {'decision', 'action', 'question', 'constraint', 'code', 'important'}
     if not any(tag in relevant_tags for tag in msg.tags):
-        return False
+        # Also export very high importance messages regardless of tags
+        if msg.importance_score < 7.5:
+            return False
     
     return True
 
 
 def _extract_title(msg: Message) -> str:
     """Extract a concise title from message content."""
-    # Try to get first sentence
     content = msg.content.strip()
     
-    # Remove markdown formatting
-    content = re.sub(r'\*\*([^*]+)\*\*', r'\1', content)  # Bold
-    content = re.sub(r'\*([^*]+)\*', r'\1', content)      # Italic
-    content = re.sub(r'`([^`]+)`', r'\1', content)        # Code
-    
-    # Get first sentence or line
+    # Priority 1: First Markdown Header
+    header_match = re.search(r'^#+\s+(.*)$', content, re.MULTILINE)
+    if header_match:
+        return _clean_text(header_match.group(1))
+
+    # Priority 2: First Bold Line
+    bold_match = re.search(r'\*\*([^*]+)\*\*', content)
+    if bold_match:
+        return _clean_text(bold_match.group(1))
+
+    # Priority 3: First sentence
     sentences = re.split(r'[.!?]\s+', content)
     if sentences:
-        title = sentences[0].strip()
+        title = _clean_text(sentences[0])
     else:
         lines = content.split('\n')
-        title = lines[0].strip() if lines else content
+        title = _clean_text(lines[0]) if lines else content
     
     # Truncate to reasonable length
-    max_length = 80
+    max_length = 70
     if len(title) > max_length:
         title = title[:max_length-3] + '...'
     
     return title
 
+def _clean_text(text: str) -> str:
+    """Strip markdown and special chars for titles."""
+    text = re.sub(r'[*_`#]', '', text)
+    text = text.replace('Tom...', '').replace('Nyra...', '').strip()
+    return text
 
-def _truncate_description(content: str, max_length: int = 500) -> str:
-    """Truncate description to reasonable length."""
-    if len(content) <= max_length:
-        return content
-    
-    return content[:max_length-3] + '...'
+def _clean_content(content: str) -> str:
+    """Clean content for CSV description."""
+    # Strip some massive blobs if helpful, but usually we want context
+    # Just fix mojibake-prone chars if needed, but utf-8-sig should handle it.
+    return content.strip()
 
 
 def _format_date(timestamp: Optional[str | datetime]) -> str:
@@ -136,8 +156,10 @@ def _format_date(timestamp: Optional[str | datetime]) -> str:
     if timestamp is None:
         dt = datetime.now()
     elif isinstance(timestamp, str):
-        # Parse ISO format string
-        dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+        try:
+            dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+        except ValueError:
+            dt = datetime.now()
     else:
         dt = timestamp
     
@@ -146,111 +168,75 @@ def _format_date(timestamp: Optional[str | datetime]) -> str:
 
 def _extract_actor(msg: Message) -> str:
     """Extract actor from message role and content."""
-    # Map roles to actors
-    role_map = {
-        'user': 'User',
-        'assistant': 'Assistant',
-        'system': 'System',
-    }
-    
+    role_map = {'user': 'Tom', 'assistant': 'Nyra', 'system': 'System'}
     actor = role_map.get(msg.role, 'Unknown')
     
-    # Try to extract specific person from content
-    # Look for patterns like "Tom said", "@username", etc.
     content_lower = msg.content.lower()
     
-    # Check for @mentions
-    mention_match = re.search(r'@([a-zA-Z0-9_-]+)', msg.content)
-    if mention_match:
-        return mention_match.group(1).title()
+    # Smart detection for legal actors
+    actors_map = {
+        'lisa': 'Lisa',
+        'blaine': 'Attorney (Blaine)',
+        'brody': 'Attorney (Brody)',
+        'jeff': 'Realtor (Jeff)',
+        'commissioner': 'Commissioner',
+        'judge': 'Judge',
+        'farm bureau': 'Insurance'
+    }
     
-    # Check for common legal actors
-    legal_actors = [
-        'opposing counsel', 'court', 'judge', 'attorney', 
-        'realtor', 'mediator', 'expert witness'
-    ]
-    
-    for legal_actor in legal_actors:
-        if legal_actor in content_lower:
-            return legal_actor.title()
-    
+    for key, val in actors_map.items():
+        if key in content_lower:
+            # If the user is talking ABOUT them, don't necessarily switch actor, 
+            # but if it's the dominant subject, maybe.
+            # For now, let's keep it simple.
+            pass
+
     return actor
 
 
 def _map_importance_to_emotion(msg: Message) -> str:
-    """Map importance score and tags to Chronicle emotion."""
     score = getattr(msg, 'importance_score', 5.0)
+    if score >= 9.0: return 'critical'
+    if score >= 8.0: return 'urgent'
+    if score >= 7.0: return 'important'
     
-    # High importance = critical/urgent
-    if score >= 9.0:
-        return 'critical'
-    elif score >= 8.0:
-        return 'urgent'
-    elif score >= 7.0:
-        return 'important'
-    
-    # Map based on tags
-    if 'decision' in msg.tags:
-        return 'decisive'
-    elif 'action' in msg.tags:
-        return 'focused'
-    elif 'question' in msg.tags:
-        return 'curious'
-    elif 'constraint' in msg.tags:
-        return 'concerned'
-    elif 'code' in msg.tags:
-        return 'technical'
-    
+    if 'decision' in msg.tags: return 'decisive'
+    if 'constraint' in msg.tags: return 'concerned'
     return 'neutral'
 
 
 def _write_chronicle_csv(events: List[dict], output_path: Path) -> None:
-    """Write events to Chronicle CSV format."""
-    fieldnames = [
-        'title',
-        'description',
-        'date',
-        'timeline',
-        'actor',
-        'emotion',
-        'tags',
-        'evidence_links',
-    ]
+    """Write events to Chronicle CSV format with UTF-8-SIG for Excel/Chronicle compatibility."""
+    fieldnames = ['title', 'description', 'date', 'timeline', 'actor', 'emotion', 'tags', 'evidence_links']
     
-    with open(output_path, 'w', newline='', encoding='utf-8') as f:
+    with open(output_path, 'w', newline='', encoding='utf-8-sig') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(events)
 
 
 def _patterns_to_chronicle_events(patterns: List, timeline_name: str) -> List[dict]:
-    """Convert detected patterns to Chronicle events."""
     from .patterns import Pattern
-    
     events = []
     
     for pattern in patterns:
-        # Use last occurrence if available, otherwise current time
         if pattern.last_occurrence:
             date = pattern.last_occurrence.strftime('%Y-%m-%d %H:%M:%S')
         else:
             date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        # Map pattern type to title
         title_map = {
             'promise_break_cycle': 'Pattern: Promise-Break Cycle',
             'escalation': 'Pattern: Escalation Detected',
-            'recurring_topic': f'Pattern: Recurring Topic',
+            'recurring_topic': 'Pattern: Recurring Topic',
             'timing_pattern': 'Pattern: Timing Anomaly',
         }
         
         title = title_map.get(pattern.pattern_type, f'Pattern: {pattern.pattern_type}')
-        
-        # Add frequency to title for recurring topics
         if pattern.pattern_type == 'recurring_topic' and pattern.evidence:
             title = f"Pattern: Recurring Topic '{pattern.evidence[0]}'"
         
-        event = {
+        events.append({
             'title': title,
             'description': pattern.description,
             'date': date,
@@ -258,9 +244,7 @@ def _patterns_to_chronicle_events(patterns: List, timeline_name: str) -> List[di
             'actor': 'System',
             'emotion': 'analytical',
             'tags': f'pattern,{pattern.pattern_type},automated',
-            'evidence_links': '',  # Could link to evidence file
-        }
-        
-        events.append(event)
+            'evidence_links': '',
+        })
     
     return events

@@ -30,13 +30,14 @@ def main(
     chronicle_timeline: str = typer.Option("Legal", "--chronicle-timeline", help="Chronicle timeline name"),
     chronicle_min_importance: float = typer.Option(5.0, "--chronicle-min-importance", help="Minimum importance score for Chronicle export"),
     chronicle_patterns: bool = typer.Option(False, "--chronicle-patterns", help="Include detected patterns as Chronicle events"),
+    byte_out: Optional[Path] = typer.Option(None, "--byte", help="Path to write the Amuse-bouche (Perfect BYTE) tactical snapshot"),
     llm: Optional[str] = typer.Option(None, "--llm", help="Ollama model name (e.g., smollm2:latest)"),
     max_brief_words: int = typer.Option(180, help="Word limit for brief"),
     schema_version: int = typer.Option(1, help="Schema version to embed in metadata"),
 ) -> None:
     """Entry point for chat-digest CLI."""
     text = path.read_text(encoding="utf-8")
-    messages = parse_transcript(text)
+    messages = parse_transcript(text, filename=path.name)
 
     if not messages:
         typer.secho("No messages parsed from transcript", fg=typer.colors.RED)
@@ -113,11 +114,29 @@ def main(
             timeline_name=chronicle_timeline,
             min_importance=chronicle_min_importance,
             include_patterns=chronicle_patterns,
+            llm_model=llm,
         )
         typer.secho(
             f"\n✓ Chronicle export written to {chronicle_out} ({event_count} events)",
             fg=typer.colors.GREEN
         )
+
+    if byte_out:
+        from .patterns import detect_all_patterns
+        from .amuse_bouche import synthesize_byte
+        
+        # Extract unique actors from messages
+        actors = sorted(list(set(msg.role for msg in messages if msg.role != "unknown")))
+        
+        # Detect patterns for synthesis
+        patterns = detect_all_patterns(messages)
+        
+        # Create the perfect byte
+        byte = synthesize_byte(summary, patterns, actors)
+        byte_md = byte.to_markdown()
+        
+        byte_out.write_text(byte_md, encoding="utf-8")
+        typer.secho(f"\n✓ Amuse-bouche (Perfect BYTE) written to {byte_out}", fg=typer.colors.MAGENTA, bold=True)
 
 
 if __name__ == "__main__":
