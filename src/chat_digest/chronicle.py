@@ -201,7 +201,10 @@ def _map_importance_to_emotion(msg: Message) -> str:
     if score >= 7.0: return 'important'
     
     if 'decision' in msg.tags: return 'decisive'
+    if 'action' in msg.tags: return 'focused'
+    if 'question' in msg.tags: return 'curious'
     if 'constraint' in msg.tags: return 'concerned'
+    if 'code' in msg.tags: return 'technical'
     return 'neutral'
 
 
